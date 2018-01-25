@@ -6,58 +6,58 @@ import scalikejdbc._
 import java.time.{LocalDate, ZonedDateTime}
 
 
-class MembersSpec extends Specification {
+class MemberSpec extends Specification {
 
-  "Members" should {
+  "Member" should {
 
-    val m = Members.syntax("m")
+    val m = Member.syntax("m")
 
     "find by primary keys" in new AutoRollback {
-      val maybeFound = Members.find(123)
+      val maybeFound = Member.find(123)
       maybeFound.isDefined should beTrue
     }
     "find by where clauses" in new AutoRollback {
-      val maybeFound = Members.findBy(sqls.eq(m.id, 123))
+      val maybeFound = Member.findBy(sqls.eq(m.id, 123))
       maybeFound.isDefined should beTrue
     }
     "find all records" in new AutoRollback {
-      val allResults = Members.findAll()
+      val allResults = Member.findAll()
       allResults.size should be_>(0)
     }
     "count all records" in new AutoRollback {
-      val count = Members.countAll()
+      val count = Member.countAll()
       count should be_>(0L)
     }
     "find all by where clauses" in new AutoRollback {
-      val results = Members.findAllBy(sqls.eq(m.id, 123))
+      val results = Member.findAllBy(sqls.eq(m.id, 123))
       results.size should be_>(0)
     }
     "count by where clauses" in new AutoRollback {
-      val count = Members.countBy(sqls.eq(m.id, 123))
+      val count = Member.countBy(sqls.eq(m.id, 123))
       count should be_>(0L)
     }
     "create new record" in new AutoRollback {
-      val created = Members.create(name = "MyString", createdAt = null)
+      val created = Member.create(name = "MyString", createdAt = null)
       created should not beNull
     }
     "save a record" in new AutoRollback {
-      val entity = Members.findAll().head
+      val entity = Member.findAll().head
       // TODO modify something
       val modified = entity
-      val updated = Members.save(modified)
+      val updated = Member.save(modified)
       updated should not equalTo(entity)
     }
     "destroy a record" in new AutoRollback {
-      val entity = Members.findAll().head
-      val deleted = Members.destroy(entity) == 1
+      val entity = Member.findAll().head
+      val deleted = Member.destroy(entity) == 1
       deleted should beTrue
-      val shouldBeNone = Members.find(123)
+      val shouldBeNone = Member.find(123)
       shouldBeNone.isDefined should beFalse
     }
     "perform batch insert" in new AutoRollback {
-      val entities = Members.findAll()
-      entities.foreach(e => Members.destroy(e))
-      val batchInserted = Members.batchInsert(entities)
+      val entities = Member.findAll()
+      entities.foreach(e => Member.destroy(e))
+      val batchInserted = Member.batchInsert(entities)
       batchInserted.size should be_>(0)
     }
   }
