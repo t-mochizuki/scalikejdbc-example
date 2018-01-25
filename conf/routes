@@ -1,3 +1,0 @@
-# Standard
-GET     /standard/message/:id       controllers.Message.show(id)
-GET     /standard/message           controllers.Message.index
