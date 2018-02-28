@@ -21,6 +21,17 @@ object Main extends App {
 
   println("Main start")
 
+  GlobalSettings.loggingSQLAndTime = LoggingSQLAndTimeSettings(
+    enabled = true,
+    singleLineMode = true,
+    printUnprocessedStackTrace = false,
+    stackTraceDepth= 15,
+    logLevel = 'debug,
+    warningEnabled = true,
+    warningThresholdMillis = 3000L,
+    warningLogLevel = 'warn
+  )
+
   DBs.setup()
 
   // DB localTx { implicit session =>
@@ -34,7 +45,7 @@ object Main extends App {
   // }
   //
   // val column = Emp.column
-  // 1 to 200000 foreach { id =>
+  // 1 to 500000 foreach { id =>
   //   DB localTx { implicit s =>
   //     withSQL {
   //       insert.into(Emp).namedValues(
@@ -61,9 +72,13 @@ object Main extends App {
   val source = Source.fromPublisher(databasePublisher)
   val outputFile = new File("taro.csv")
   val sink = FileIO.toPath(outputFile.toPath, options = Set(CREATE, WRITE, TRUNCATE_EXISTING))
-  val runnableGraph = source.map(entity => s"${entity.name}\n").map(akka.util.ByteString(_)).to(sink)
+  val runnableGraph = source.map(entity => s"${entity.name}\n").map(akka.util.ByteString(_))
 
-  runnableGraph.run()
+  runnableGraph
+    .runWith(sink)
+    .andThen {
+      case _ => system.terminate
+    }
 
   println("Main end")
 
