@@ -1,9 +1,9 @@
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{FileIO, Source}
-import java.io.File
-import java.nio.file.StandardOpenOption._
+import akka.stream.scaladsl.Source
+import java.io.{File, FileOutputStream}
 
+import org.apache.poi.xssf.streaming.SXSSFWorkbook
 import scalikejdbc._
 import scalikejdbc.config._
 import scalikejdbc.streams._
@@ -16,7 +16,7 @@ case class Emp(
 
 object Emp extends SQLSyntaxSupport[Emp]
 
-// JAVA_OPTS="-Xmx80M" sbt run
+// JAVA_OPTS="-Xmx100M" sbt run
 object Main extends App {
 
   println("Main start")
@@ -61,6 +61,7 @@ object Main extends App {
   implicit val dispatcher = system.dispatcher
 
   val emp = Emp.syntax("emp")
+
   val databasePublisher: DatabasePublisher[Emp] = DB readOnlyStream {
     withSQL {
       selectFrom(Emp as emp)
@@ -70,15 +71,26 @@ object Main extends App {
   }
 
   val source = Source.fromPublisher(databasePublisher)
-  val outputFile = new File("taro.csv")
-  val sink = FileIO.toPath(outputFile.toPath, options = Set(CREATE, WRITE, TRUNCATE_EXISTING))
-  val runnableGraph = source.map(entity => s"${entity.name}\n").map(akka.util.ByteString(_))
+  val runnableGraph = source.zipWithIndex
+
+  val workbook = new SXSSFWorkbook
+  val sheet = workbook.createSheet("test1")
 
   runnableGraph
-    .runWith(sink)
-    .andThen {
-      case _ => system.terminate
+    .runForeach {
+      case (entity, rowIndex) => sheet.createRow(rowIndex.toInt).createCell(0).setCellValue(entity.name)
     }
+    .andThen {
+      case _ => {
+        val output = File.createTempFile("taka", ".xlsx")
+        println(output.getPath)
+        val stream = new FileOutputStream(output)
+        workbook.write(stream)
+
+        system.terminate
+      }
+    }
+
 
   println("Main end")
 
