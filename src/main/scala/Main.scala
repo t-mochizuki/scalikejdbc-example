@@ -1,98 +1,65 @@
+package example
+
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import java.io.{File, FileOutputStream}
 
 import org.apache.poi.xssf.streaming.SXSSFWorkbook
+// import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import scalikejdbc._
 import scalikejdbc.config._
 import scalikejdbc.streams._
 
-case class Emp(
-  id: Long,
-  name: String,
-  createdAt: java.time.ZonedDateTime
-)
-
-object Emp extends SQLSyntaxSupport[Emp]
-
-// JAVA_OPTS="-Xmx100M" sbt run
+// JAVA_OPTS="-Xmx200M" sbt run
 object Main extends App {
 
   println("Main start")
 
-  GlobalSettings.loggingSQLAndTime = LoggingSQLAndTimeSettings(
-    enabled = true,
-    singleLineMode = true,
-    printUnprocessedStackTrace = false,
-    stackTraceDepth= 15,
-    logLevel = 'debug,
-    warningEnabled = true,
-    warningThresholdMillis = 3000L,
-    warningLogLevel = 'warn
-  )
-
   DBs.setup()
-
-  // DB localTx { implicit session =>
-  //   sql"""
-  //   create table emp (
-  //     id serial not null primary key,
-  //     name varchar(64) not null,
-  //     created_at timestamp not null
-  //   )
-  //   """.execute.apply()
-  // }
-  //
-  // val column = Emp.column
-  // 1 to 500000 foreach { id =>
-  //   DB localTx { implicit s =>
-  //     withSQL {
-  //       insert.into(Emp).namedValues(
-  //         column.id -> id,
-  //         column.name -> s"taro$id",
-  //         column.createdAt -> sqls.currentTimestamp)
-  //     }.update.apply()
-  //   }
-  // }
 
   implicit val system = ActorSystem("system")
   implicit val materializer = ActorMaterializer()
   implicit val dispatcher = system.dispatcher
 
-  val emp = Emp.syntax("emp")
-
+  // source
   val databasePublisher: DatabasePublisher[Emp] = DB readOnlyStream {
+    val emp = Emp.syntax("emp")
     withSQL {
       selectFrom(Emp as emp)
     }.map { rs =>
       Emp(rs.get(emp.resultName.id), rs.get(emp.resultName.name), rs.get(emp.resultName.createdAt))
     }.iterator()
   }
+  val source: Source[Emp, NotUsed] = Source.fromPublisher(databasePublisher)
 
-  val source = Source.fromPublisher(databasePublisher)
-  val runnableGraph = source.zipWithIndex
-
+  // POI-SXSSF
   val workbook = new SXSSFWorkbook
+  // POI-XSSF
+  // val workbook = new XSSFWorkbook
   val sheet = workbook.createSheet("test1")
 
-  runnableGraph
+  source
+    .zipWithIndex
     .runForeach {
-      case (entity, rowIndex) => sheet.createRow(rowIndex.toInt).createCell(0).setCellValue(entity.name)
+      case (entity, rowIndex) =>
+        val row = sheet.createRow(rowIndex.toInt)
+        row.createCell(0).setCellValue(entity.id)
+        row.createCell(1).setCellValue(entity.name)
+        row.createCell(2).setCellValue(entity.createdAt.toString)
     }
     .andThen {
       case _ => {
-        val output = File.createTempFile("taka", ".xlsx")
-        println(output.getPath)
+        val output = File.createTempFile("taro", ".xlsx")
+        println(s"File path is ${output.getPath}")
         val stream = new FileOutputStream(output)
         workbook.write(stream)
 
+        stream.close
         system.terminate
       }
     }
 
-
   println("Main end")
-
-  // system.terminate()
 }
